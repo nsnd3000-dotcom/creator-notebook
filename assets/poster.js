@@ -34,6 +34,9 @@
     subTop: 216, subFont: 40,
     afterTitle: 196,
 
+    /* 设计者署名：图右上角、与世界名同一行 */
+    designerFont: 28, designerTop: 143, designerGap: 56, designerMaxW: 0.3,
+
     labelX: 28, labelFont: 42, labelH: 40,
 
     cardW: 274, cardH: 274,
@@ -43,14 +46,14 @@
     imgTextGap: 34,
     textFont: 46, lineH: 64, textMaxW: 266,
 
-    /* 卡片文字：名字 / 副信息 / 简介（简介来自人物页、势力页的简介字段） */
+    /* 卡片文字：名字 / 称号（副信息） / 简介 —— 三级字号，简介最小 */
     cardTextW: 282,
     nameFont: 46, nameH: 62,
     metaFont: 32, metaH: 44,
-    bioFont: 32, bioLineH: 46, bioLines: 3,
+    bioFont: 26, bioLineH: 37, bioLines: 4,
 
     storyTitleGap: 25, storyTitleFont: 42, storyTitleLh: 56, storyTitleLines: 2,
-    storyTextGap: 22, storyFont: 42, storyLineH: 56, storyLines: 4,
+    storyTextGap: 22, storyFont: 36, storyLineH: 50, storyLines: 4,
 
     wideX: 158, wideW: 752, wideH: 541,
 
@@ -64,6 +67,7 @@
       bg: '#000000', text: '#ffffff', textDim: 'rgba(255,255,255,.80)',
       label: 'rgba(255,255,255,.92)', phFill: '#141418', phLine: '#2a2a33', phText: '#3a3a46',
       footer: 'rgba(255,255,255,.35)',
+      designer: 'rgba(255,255,255,.60)',
       credit: 'rgba(255,255,255,.46)', creditDim: 'rgba(255,255,255,.26)',
       creditLine: 'rgba(255,255,255,.12)'
     },
@@ -71,6 +75,7 @@
       bg: '#f3efe6', text: '#141318', textDim: 'rgba(20,19,24,.78)',
       label: 'rgba(20,19,24,.9)', phFill: '#ded5c2', phLine: '#c7bba4', phText: '#a99e86',
       footer: 'rgba(20,19,24,.4)',
+      designer: 'rgba(20,19,24,.62)',
       credit: 'rgba(20,19,24,.5)', creditDim: 'rgba(20,19,24,.3)',
       creditLine: 'rgba(20,19,24,.14)'
     }
@@ -462,12 +467,45 @@
     ctx.fillStyle = T.bg;
     ctx.fillRect(0, 0, P.W, H);
 
-    // 标题（没填就留白，不塞占位词）
+    // 标题（没填就留白，不塞占位词）+ 右上角「设计者」
+    const titleText = (world.meta && world.meta.name) || '未命名世界';
+    const designerName = String((world.meta && world.meta.designer) || '').trim();
+    const designerText = designerName ? `设计者：${designerName}` : '';
+
+    // 先量设计者那行要占多宽：标题太长时自动缩字号，两者不会撞在一起
+    let dText = '', dFont = P.designerFont;
+    if (designerText) {
+      // 设计者最多占可用宽度的 30%，保证世界名始终是主角
+      ctx.font = `${dFont}px ${FF}`;
+      const fit = fitShrink(ctx, designerText, (P.W - P.titleX * 2) * P.designerMaxW, dFont, 16);
+      dText = fit.text; dFont = fit.font;
+      ctx.font = `${dFont}px ${FF}`;
+    }
+    const dw = dText ? ctx.measureText(dText).width : 0;
+
+    let titleFont = P.titleFont;
+    ctx.font = `${titleFont}px ${FF}`;
+    const titleMax = P.W - P.titleX * 2 - (dw ? dw + P.designerGap : 0);
+    while (titleFont > 64 && ctx.measureText(titleText).width > titleMax) {
+      titleFont -= 2;
+      ctx.font = `${titleFont}px ${FF}`;
+    }
+    const titleOut = ctx.measureText(titleText).width > titleMax
+      ? fitOneLine(ctx, titleText, titleMax)
+      : titleText;
+
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     ctx.fillStyle = T.text;
-    ctx.font = `${P.titleFont}px ${FF}`;
-    ctx.fillText(world.meta.name || '未命名世界', P.titleX, P.titleTop);
+    ctx.font = `${titleFont}px ${FF}`;
+    ctx.fillText(titleOut, P.titleX, P.titleTop);
+
+    if (dText) {
+      ctx.textAlign = 'right';
+      ctx.fillStyle = T.designer;
+      ctx.font = `${dFont}px ${FF}`;
+      ctx.fillText(dText, P.W - P.titleX, P.designerTop);
+    }
 
     if (opt._hasSub && opt._hasTitle) {
       ctx.font = `${P.subFont}px ${FF}`;

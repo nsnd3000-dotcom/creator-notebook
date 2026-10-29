@@ -41,7 +41,7 @@
     { id: 'characters', label: '人物', icon: 'user', key: 'characters' },
     { id: 'relations', label: '关系网', icon: 'net', key: 'relations' },
     { id: 'factions', label: '势力', icon: 'flag', key: 'factions' },
-    { id: 'cities', label: '城市与背景', icon: 'city', key: 'cities' },
+    { id: 'cities', label: '世界一角', icon: 'city', key: 'cities' },
     { id: 'stories', label: '故事', icon: 'book', key: 'stories' },
     { id: 'timeline', label: '时间线', icon: 'time', key: 'timeline' },
     { id: 'memos', label: '备忘录', icon: 'note', key: 'memos' },
@@ -82,7 +82,7 @@
       auto: () => ({ name: '', motto: '', leader: '', desc: '', tags: [], color: '#7f93b8', image: '' })
     },
     cities: {
-      kicker: 'Place', title: '城市与背景',
+      kicker: 'Place', title: '地点',
       fields: [
         { k: 'name', label: '名称', type: 'text', req: true, ph: '雾港' },
         { k: 'region', label: '所在地域', type: 'text', ph: '北岸 · 潮汐三角洲' },
@@ -462,6 +462,14 @@
         </div>
       </div>
 
+      <div style="margin-top:16px">
+        <label class="mini-label" for="designerInput">设计者</label>
+        <input class="mini-input" id="designerInput" type="text" spellcheck="false"
+               placeholder="填你的名字，会印在图右上角"
+               value="${esc(w.meta.designer || '')}" />
+        <p class="mini-hint">留空则图上不出现这一行。填了就写成「设计者：名字」，小字排在名字右侧。</p>
+      </div>
+
       <div style="margin-top:18px">
         <div class="field-row" style="padding:0;margin-bottom:9px">
           <label>世界一角</label>
@@ -650,7 +658,7 @@
       </article>`).join('');
 
     return `
-      ${pageHead('城市与背景', `共 ${list.length} 处。城市图可直接用作长图底部的「世界一角」。`,
+      ${pageHead('世界一角', `这里可添加城市。写它的样子、位置与归属，城市图会直接用作长图底部的「世界一角」。`,
         `<button class="btn primary" data-act="new-item" data-key="cities">${ic('plus')} 新增地点</button>`)}
       <div class="grid c3">
         ${cards}
@@ -1715,6 +1723,14 @@
       document.title = (e.target.value || '未命名世界') + ' · 创世者的笔记本';
       persist();
       if (App.route === 'overview') repaintPoster();
+    });
+
+    // 设计者：写在长图右上角的那一行（面板会随重绘重建，用委托绑定）
+    document.addEventListener('input', e => {
+      if (e.target.id !== 'designerInput') return;
+      App.world.meta.designer = e.target.value;
+      persist();
+      repaintPoster();
     });
 
     window.addEventListener('hashchange', () => {

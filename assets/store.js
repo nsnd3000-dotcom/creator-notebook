@@ -126,6 +126,7 @@
         name: '雾港纪元',
         subtitle: '在潮汐与齿轮之间',
         author: '',
+        designer: '',
         createdAt: Date.now(),
         updatedAt: Date.now()
       },
@@ -229,6 +230,7 @@
         name: name || '',
         subtitle: '',
         author: '',
+        designer: '',
         createdAt: Date.now(),
         updatedAt: Date.now()
       },
@@ -243,6 +245,7 @@
     if (!s || typeof s !== 'object') return blankWorld('');
     s.version = s.version || 1;
     s.meta = s.meta || { name: '未命名世界' };
+    if (typeof s.meta.designer !== 'string') s.meta.designer = '';
     ['characters', 'relations', 'factions', 'cities', 'stories', 'timeline', 'memos', 'todos'].forEach(k => {
       if (!Array.isArray(s[k])) s[k] = [];
     });
