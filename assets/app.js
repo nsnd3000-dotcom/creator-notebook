@@ -385,7 +385,7 @@
           <h2>数据都在哪、怎么删 <i>Where &amp; how to erase</i></h2>
           <table class="priv-table">
             <tr><th>内容</th><th>存在哪</th><th>怎么删</th></tr>
-            <tr><td>世界设定</td><td>本机 IndexedDB（库名 worldcraft）</td><td>浏览器「清除站点数据」，或删除浏览数据</td></tr>
+            <tr><td>世界设定、备忘录、待办</td><td>本机 IndexedDB（库名 worldcraft）</td><td>浏览器「清除站点数据」，或删除浏览数据</td></tr>
             <tr><td>关系图坐标、长图设置</td><td>本机 localStorage</td><td>同上</td></tr>
             <tr><td>导入的图片</td><td>以 dataURL 存进 IndexedDB</td><td>同上</td></tr>
             <tr><td>导出图、备份 JSON</td><td>你选择的下载目录</td><td>自己删文件即可</td></tr>
