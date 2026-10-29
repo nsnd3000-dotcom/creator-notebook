@@ -26,7 +26,8 @@
     x: '<path d="M6 6l12 12M18 6L6 18"/>',
     img: '<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M4 17l5-4.6 4 3.4 3-2.4 4 3.6"/>',
     down: '<path d="M12 3.5v11.8M12 15.3l-4-4M12 15.3l4-4M4.5 19.5h15"/>',
-    refresh: '<path d="M19.5 12a7.5 7.5 0 11-2.2-5.3M19.8 4.5v4.4h-4.4"/>'
+    refresh: '<path d="M19.5 12a7.5 7.5 0 11-2.2-5.3M19.8 4.5v4.4h-4.4"/>',
+    lock: '<rect x="4.6" y="10.4" width="14.8" height="9.9" rx="1.4"/><path d="M8.2 10.4V7.7a3.8 3.8 0 017.6 0v2.7"/><circle cx="12" cy="15.3" r="1.05"/>'
   };
   const ic = (n, cls) => `<svg viewBox="0 0 24 24" class="ico${cls ? ' ' + cls : ''}">${IC[n] || ''}</svg>`;
 
@@ -38,7 +39,8 @@
     { id: 'factions', label: '势力', icon: 'flag', key: 'factions' },
     { id: 'cities', label: '城市与背景', icon: 'city', key: 'cities' },
     { id: 'stories', label: '故事', icon: 'book', key: 'stories' },
-    { id: 'timeline', label: '时间线', icon: 'time', key: 'timeline' }
+    { id: 'timeline', label: '时间线', icon: 'time', key: 'timeline' },
+    { id: 'privacy', label: '本地模式', icon: 'lock' }
   ];
 
   /* ---------------- 表单 Schema ---------------- */
@@ -225,7 +227,8 @@
       factions: renderFactions,
       cities: renderCities,
       stories: renderStories,
-      timeline: renderTimeline
+      timeline: renderTimeline,
+      privacy: renderPrivacy
     };
     view.innerHTML = `<div class="view-inner">${(map[App.route] || renderOverview)()}</div>`;
     view.scrollTop = 0;
@@ -265,6 +268,15 @@
         `<button class="btn" data-act="export-json">${ic('down')} 备份</button>
          <button class="btn primary" data-act="export-poster">${ic('down')} 导出长图</button>`)}
 
+      <div class="local-banner">
+        <div class="lb-ico">${ic('lock')}</div>
+        <div class="lb-text">
+          <b>纯本地模式 · 你写的一切只存在这台设备上</b>
+          <span>没有服务器、没有账号、没有统计，页面加载完成后不向任何第三方发送请求；内容不会被上传、同步，也无从被爬取。断网也能照常编辑与导出。</span>
+        </div>
+        <button class="btn sm ghost" data-act="nav" data-route="privacy">看原理</button>
+      </div>
+
       <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">
         ${stats.map(s => `<span class="chip">${s[0]} <b style="color:#e6cf9e;margin-left:2px">${s[1]}</b></span>`).join('')}
         <span class="chip gold">${esc(w.meta.subtitle || '未填写副标题')}</span>
@@ -288,6 +300,86 @@
           </div>
         </div>
         ${posterPanel(po)}
+      </div>`;
+  }
+
+  /* ---------------- 本地模式说明 ---------------- */
+  function renderPrivacy() {
+    return `
+      ${pageHead('本地模式', '这份声明写的是这个站点的运行方式，不是一串口号——下面每一条，都能在浏览器里当场验证。')}
+      <div class="priv">
+        <p class="priv-lede">你在这里写下的每一个字、上传的每一张图，都只存在于<em>这台设备的浏览器</em>里。没有服务器接收，没有账号绑定，没有云端副本，也没有任何一条路径能让它被上传、同步，或被爬虫取走。</p>
+
+        <div class="priv-sec">
+          <div class="priv-promise">
+            <div class="priv-card">
+              <span class="pc-n">01</span>
+              <strong>没有后端</strong>
+              <span>站点只有 HTML、CSS、JS、一张背景图和一份字体文件。没有接口、没有数据库、没有账号系统——不存在一个"收数据的地方"。</span>
+            </div>
+            <div class="priv-card">
+              <span class="pc-n">02</span>
+              <strong>没有网络请求</strong>
+              <span>首屏加载完成后，页面不再发出任何请求：没有 fetch、没有 XHR、没有 WebSocket、没有统计埋点，也没有第三方 CDN 或在线字体服务。</span>
+            </div>
+            <div class="priv-card">
+              <span class="pc-n">03</span>
+              <strong>没有被爬取的面</strong>
+              <span>爬虫能拿到的只有 GitHub 上这份公开源码，以及一个对所有人都一样的空白编辑器。你的世界从未进入网络，因此不存在"被爬"的介质。</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="priv-sec">
+          <h2>这一切的原理 <i>How it works</i></h2>
+          <ol class="priv-list">
+            <li><b>纯静态，没有任何服务端。</b>整个应用是几个 JS 文件在浏览器里运行，零依赖、无框架、无构建步骤。所谓"保存"，就是写进浏览器的本地存储，没有任何一步是发给别人的。</li>
+            <li><b>数据落在哪。</b>世界内容写进浏览器的 <code>IndexedDB</code>（库名 <code>worldcraft</code>）；关系图的节点坐标、长图设置写进 <code>localStorage</code>。两者都受<b>同源策略</b>保护：只有本域名的脚本能读，别的网站、别的标签页都拿不到；网页也没有权限直接读写你的硬盘。</li>
+            <li><b>请求面只有首屏那几个文件。</b>打开页面时浏览器只请求本站的 <code>index.html</code>、<code>style.css</code>、几个 <code>.js</code>、<code>bg.jpg</code> 和一份 <code>woff2</code> 字体。字体放在仓库里，而不是字体 CDN 上——很多号称"本地"的工具恰恰在这一步把访问记录交给了第三方，这里没有这一步。</li>
+            <li><b>图片不出设备。</b>选择、拖拽、Ctrl+V 粘贴的图，都由浏览器读成内存里的数据；压缩和裁剪在 Canvas 上完成，全程不经过任何网络。</li>
+            <li><b>导出是本地绘制。</b>长图和关系图由 Canvas 在内存里逐像素画出来，<code>toBlob()</code> 生成 PNG，再用一个隐藏的下载链接交给浏览器的下载通道存到你的硬盘。没有上传接口，也没有图片服务器。</li>
+            <li><b>备份是一个文件。</b>"备份数据"生成的 JSON 通过本地 Blob 下载。它只在你主动发给别人（聊天、邮件、网盘）时，才会离开这台设备。</li>
+            <li><b>从爬虫的视角看。</b>AI 爬虫抓的是公开网页。这个站点的公开部分永远只有"一份空白编辑器加源码"；内容躺在 IndexedDB 里，需要你这台机器的浏览器上下文才能读，任何外部 HTTP 请求都触不到它。</li>
+          </ol>
+        </div>
+
+        <div class="priv-sec">
+          <h2>怎么自己验证 <i>Verify yourself</i></h2>
+          <ol class="priv-list">
+            <li><b>拔网线。</b>打开页面、载入示例、改两个人物、导出一张长图——断网状态下一切照常。一个真的在偷偷上传的应用，这时候会卡住或报错。</li>
+            <li><b>看 Network 面板。</b>按 F12 打开开发者工具，切到 Network 并勾上 Preserve log，然后把上面那套操作做一遍：除了最开始加载的几个静态文件，不会出现任何新请求。</li>
+            <li><b>看存储。</b>开发者工具 → Application → IndexedDB → <code>worldcraft</code>，你的资料就在本地的库里；点一下 Clear site data，内容彻底消失，没有任何"云端副本"残留。</li>
+            <li><b>读源码。</b>在仓库里搜 <code>fetch(</code>、<code>XMLHttpRequest</code>、<code>sendBeacon</code>，全项目只有一处，且只在你主动粘贴图片链接时触发（见下方边界说明）。</li>
+          </ol>
+        </div>
+
+        <div class="priv-sec">
+          <h2>数据都在哪、怎么删 <i>Where &amp; how to erase</i></h2>
+          <table class="priv-table">
+            <tr><th>内容</th><th>存在哪</th><th>怎么删</th></tr>
+            <tr><td>世界设定</td><td>本机 IndexedDB（库名 worldcraft）</td><td>浏览器「清除站点数据」，或删除浏览数据</td></tr>
+            <tr><td>关系图坐标、长图设置</td><td>本机 localStorage</td><td>同上</td></tr>
+            <tr><td>导入的图片</td><td>以 dataURL 存进 IndexedDB</td><td>同上</td></tr>
+            <tr><td>导出图、备份 JSON</td><td>你选择的下载目录</td><td>自己删文件即可</td></tr>
+          </table>
+        </div>
+
+        <div class="priv-sec">
+          <div class="priv-bound">
+            <h3>边界：这几件事说清楚，才算严格</h3>
+            <ul>
+              <li><b>托管平台会看到"有人打开了这个页面"。</b>GitHub Pages 的服务器日志会记录访问本身（IP、时间、浏览器标识），这是任何网站都有的一层。它记录的是"打开过页面"，不是你在页面里写了什么——那些内容从未发送出去。</li>
+              <li><b>你主动粘贴图片链接导入时，会向那个地址发一次请求。</b>目标是你给的图片所在网站，与本站无关，且已关闭凭据携带；不想要这次请求，就改成本地选图上传。</li>
+              <li><b>你设备上的其他程序不在这份声明范围内。</b>浏览器扩展、输入法的云候选、把浏览器配置目录同步到网盘的软件，都可能读到本地数据——那是你自己装的东西，不是这个站点。</li>
+              <li><b>分享即公开。</b>把导出图或备份 JSON 发给别人，对方就拿到了内容。这是你按下的动作，不是后台行为。</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="priv-foot">
+          <span>最后核对：2026.10.29 · 测试版 v0.1.0</span>
+          <a href="https://github.com/nsnd3000-dotcom/creator-notebook" target="_blank" rel="noopener">github.com/nsnd3000-dotcom/creator-notebook</a>
+        </div>
       </div>`;
   }
 
