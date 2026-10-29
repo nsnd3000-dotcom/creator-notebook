@@ -487,7 +487,7 @@
         <p style="font-size:10.5px;color:#63636f;line-height:1.7;margin:8px 0 0;letter-spacing:.02em">
           ${po.showScene === false
             ? '已关闭：导出图底部不会出现这张大图，其余区块自动上移。'
-            : '不选时自动取第一张带图的城市或故事封面。卡片文字 = 名字 + 称号/势力 + 简介，改表单即改图。'}
+            : '不选时自动取第一张带图的城市或故事封面。图下照人物卡片排：城市名 / 位置与归属 / 简介，改表单即改图。'}
         </p>
       </div>
 
@@ -498,7 +498,7 @@
       <div style="margin-top:20px;display:flex;flex-direction:column;gap:8px">
         <button class="btn primary block" data-act="export-poster">${ic('down')} 导出长图 PNG</button>
         <p style="font-size:11px;color:#63636f;margin:0;line-height:1.7">
-          逐行排布：每行 3 个人物、3 个势力、2 个故事，底部一张大场景图。未选时自动取最前面的条目。
+          逐行排布：每行 3 个人物、3 个势力、2 个故事，底部一张大场景图，图下写城市名与简介。
         </p>
       </div>
     </aside>`;

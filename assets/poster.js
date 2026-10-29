@@ -57,6 +57,9 @@
 
     wideX: 158, wideW: 752, wideH: 541,
 
+    /* 世界一角图下的文字：与人物/势力卡片同一套字阶（名字 / 位置归属 / 简介） */
+    sceneTextGap: 34, sceneTextW: 752, sceneBioLines: 3,
+
     sectionGap: 104,
     rowGap: 64,
     bottom: 300
@@ -265,6 +268,23 @@
     });
   }
 
+  /* 世界一角图下的文字：名字 / 位置归属 / 简介，量法与卡片一致 */
+  function prepareScene(secs) {
+    const mctx = document.createElement('canvas').getContext('2d');
+    secs.forEach(s => {
+      if (s.kind !== 'wide') return;
+      const it = s.item;
+      mctx.font = `${P.nameFont}px ${FF}`;
+      const nm = fitShrink(mctx, it.name, P.sceneTextW, P.nameFont, 30);
+      it._name = nm.text; it._nameFont = nm.font;
+      mctx.font = `${P.metaFont}px ${FF}`;
+      const mo = fitShrink(mctx, it.meta, P.sceneTextW, P.metaFont, 24);
+      it._meta = mo.text; it._metaFont = mo.font;
+      mctx.font = `${P.bioFont}px ${FF}`;
+      it._bio = wrapNice(mctx, it.bio, P.sceneTextW, P.sceneBioLines);
+    });
+  }
+
   /* 故事标题：先缩字号凑成一行，实在放不下再两行对半分 */
   function prepareStories(secs) {
     const mctx = document.createElement('canvas').getContext('2d');
@@ -322,32 +342,56 @@
       });
     }
 
-    // 世界一角
+    // 世界一角：和人物/势力卡片一样，图下带「名字 + 位置归属 + 简介」，文字取自城市本身
     const ref = po.sceneRef || { type: 'auto' };
-    let sceneImg = '';
-    let sceneTitle = '';
+    const cityCard = c => ({
+      img: c.image || '', key: c.name || '',
+      name: c.name || '',
+      meta: [c.region, c.factionId ? Store.factionName(c.factionId) : ''].filter(Boolean).join(' · '),
+      bio: c.desc || ''
+    });
+    const storyCard = s => ({
+      img: s.image || '', key: s.title || '',
+      name: s.title || '',
+      meta: [s.type === 'long' ? '长篇' : '短篇', s.status].filter(Boolean).join(' · '),
+      bio: storyText(s)
+    });
+    const merge = (base, extra) => ({
+      img: extra.img || base.img,
+      key: base.key || extra.key,
+      name: base.name || extra.name,
+      meta: base.meta || extra.meta,
+      bio: base.bio || extra.bio
+    });
+
+    let scene = { img: '', key: '', name: '', meta: '', bio: '' };
     if (ref.type === 'custom' && ref.src) {
-      sceneImg = ref.src;
+      scene.img = ref.src;                 // 自定义上传图没有城市文本，图下只留空白
     } else if (ref.type === 'city') {
       const c = (world.cities || []).find(x => x.id === ref.id);
-      if (c) { sceneImg = c.image || ''; sceneTitle = c.name; }
+      if (c) scene = cityCard(c);
     } else if (ref.type === 'story') {
       const s = (world.stories || []).find(x => x.id === ref.id);
-      if (s) { sceneImg = s.image || ''; sceneTitle = s.title; }
+      if (s) scene = storyCard(s);
     }
-    if (!sceneImg) {
+    if (!scene.img) {
       const city = (world.cities || []).find(c => c.image);
-      if (city) { sceneImg = city.image; sceneTitle = sceneTitle || city.name; }
+      if (city) scene = merge(scene, cityCard(city));
     }
-    if (!sceneImg) {
+    if (!scene.img) {
       const st = (world.stories || []).find(s => s.image);
-      if (st) { sceneImg = st.image; sceneTitle = sceneTitle || st.title; }
+      if (st) scene = merge(scene, storyCard(st));
+    }
+    // 一张图都没有时，占位框也带上第一座城市的名字与简介，图下不会空白（自定义上传图除外）
+    if (!scene.name && ref.type !== 'custom') {
+      const city = (world.cities || [])[0];
+      if (city) scene = merge(scene, cityCard(city));
     }
     // 世界一角：保留 PSD 底部大图位，没图时给占位框；也可在设置里整个关掉
-    if (opt.showScene !== false && (sceneImg || opt.alwaysShowScene)) {
+    if (opt.showScene !== false && (scene.img || opt.alwaysShowScene)) {
       secs.push({
         kind: 'wide', label: '世界一角：', gapAfterLabel: 80,
-        item: { img: sceneImg, key: sceneTitle }
+        item: scene
       });
     }
 
@@ -403,6 +447,14 @@
     return h + (rows - 1) * P.rowGap;
   }
 
+  function sceneContentH(s) {
+    const it = s.item;
+    const textH = (it._name ? P.nameH : 0)
+      + (it._meta ? P.metaH : 0)
+      + ((it._bio || []).length * P.bioLineH);
+    return P.wideH + (textH ? P.sceneTextGap + textH : 0);
+  }
+
   function measure(secs, opt) {
     let y = P.titleTop + P.titleH + (opt._hasSub ? 56 : 0) + P.afterTitle;
     secs.forEach(s => {
@@ -410,7 +462,7 @@
         ? cardContentH(s)
         : s.kind === 'stories'
           ? storyContentH(s)
-          : P.wideH;
+          : sceneContentH(s);
       s._contentH = contentH;
       s._top = y;
       y += P.labelH + s.gapAfterLabel + contentH + P.sectionGap;
@@ -443,6 +495,7 @@
     const secs = buildSections(world, opt);
     prepareCards(secs);
     prepareStories(secs);
+    prepareScene(secs);
     const H = Math.round(Math.max(measure(secs, opt), 900));
 
     // 预加载图片
@@ -580,6 +633,7 @@
       } else if (s.kind === 'wide') {
         const img = s.item.img ? imgMap.get(s.item.img) : null;
         drawImageBox(ctx, T, img, P.wideX, y, P.wideW, P.wideH, s.item.key, null);
+        drawSceneText(ctx, T, s.item, y + P.wideH + P.sceneTextGap);
       }
     });
 
@@ -651,6 +705,39 @@
       ctx.font = `${P.bioFont}px ${FF}`;
       ctx.fillStyle = T.textDim;
       it._bio.forEach(l => {
+        ctx.fillText(l, cx, ty);
+        ty += P.bioLineH;
+      });
+    }
+  }
+
+  /* 世界一角图下的三段文字：居中排在大图正下方，与卡片同一套字阶 */
+  function drawSceneText(ctx, T, it, top) {
+    const name = it._name || '';
+    const meta = it._meta || '';
+    const bio = it._bio || [];
+    if (!name && !meta && !bio.length) return;
+    const cx = P.wideX + P.wideW / 2;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    let ty = top;
+
+    if (name) {
+      ctx.font = `${it._nameFont || P.nameFont}px ${FF}`;
+      ctx.fillStyle = T.text;
+      ctx.fillText(name, cx, ty);
+      ty += P.nameH;
+    }
+    if (meta) {
+      ctx.font = `${it._metaFont || P.metaFont}px ${FF}`;
+      ctx.fillStyle = T.textDim;
+      ctx.fillText(meta, cx, ty);
+      ty += P.metaH;
+    }
+    if (bio.length) {
+      ctx.font = `${P.bioFont}px ${FF}`;
+      ctx.fillStyle = T.textDim;
+      bio.forEach(l => {
         ctx.fillText(l, cx, ty);
         ty += P.bioLineH;
       });
