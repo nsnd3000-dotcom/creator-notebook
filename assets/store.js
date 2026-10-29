@@ -191,6 +191,24 @@
           title: '第十三座灯塔重新点亮', desc: '林砚接任第十三座灯塔看守。当夜，全城钟表同时慢了四分钟。'
         }
       ],
+      memos: [
+        {
+          id: uidBak('m'), title: '关于雾的三种说法',
+          body: '一、雾是活的，它在找人。\n二、雾是死的，它只是把活着的东西都吃掉了。\n三、雾从来不存在，是所有人的记忆同时出了一点差错。\n\n——老看守只肯说第三种，因为前两种会招来东西。',
+          createdAt: Date.now(), updatedAt: Date.now()
+        },
+        {
+          id: uidBak('m'), title: '名字',
+          body: '汀不记得自己的名字，但每次潮水退去，她都会在沙滩上写同一个字。\n那个字被人擦掉过七次，她写了第八次。',
+          createdAt: Date.now(), updatedAt: Date.now()
+        }
+      ],
+      todos: [
+        { id: uidBak('t'), text: '把「汐下」的地形画一张草图', done: false, createdAt: Date.now() },
+        { id: uidBak('t'), text: '确定林砚左手的齿轮一共几枚（关系到结局）', done: false, createdAt: Date.now() },
+        { id: uidBak('t'), text: '给第十三座灯塔写一段完整的描写', done: true, createdAt: Date.now() },
+        { id: uidBak('t'), text: '翻一遍旧王庭的时间线，检查有没有矛盾', done: false, createdAt: Date.now() }
+      ],
       poster: {
         theme: 'dark',
         showSubtitle: true,
@@ -215,7 +233,7 @@
         updatedAt: Date.now()
       },
       characters: [], relations: [], factions: [], cities: [],
-      stories: [], timeline: [],
+      stories: [], timeline: [], memos: [], todos: [],
       poster: { theme: 'dark', showSubtitle: true, showFooter: false, showScene: true, sceneRef: { type: 'auto' }, characters: [], factions: [], stories: [] }
     };
   }
@@ -225,7 +243,7 @@
     if (!s || typeof s !== 'object') return blankWorld('');
     s.version = s.version || 1;
     s.meta = s.meta || { name: '未命名世界' };
-    ['characters', 'relations', 'factions', 'cities', 'stories', 'timeline'].forEach(k => {
+    ['characters', 'relations', 'factions', 'cities', 'stories', 'timeline', 'memos', 'todos'].forEach(k => {
       if (!Array.isArray(s[k])) s[k] = [];
     });
     s.poster = Object.assign(

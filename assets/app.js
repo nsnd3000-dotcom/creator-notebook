@@ -27,7 +27,11 @@
     img: '<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M4 17l5-4.6 4 3.4 3-2.4 4 3.6"/>',
     down: '<path d="M12 3.5v11.8M12 15.3l-4-4M12 15.3l4-4M4.5 19.5h15"/>',
     refresh: '<path d="M19.5 12a7.5 7.5 0 11-2.2-5.3M19.8 4.5v4.4h-4.4"/>',
-    lock: '<rect x="4.6" y="10.4" width="14.8" height="9.9" rx="1.4"/><path d="M8.2 10.4V7.7a3.8 3.8 0 017.6 0v2.7"/><circle cx="12" cy="15.3" r="1.05"/>'
+    lock: '<rect x="4.6" y="10.4" width="14.8" height="9.9" rx="1.4"/><path d="M8.2 10.4V7.7a3.8 3.8 0 017.6 0v2.7"/><circle cx="12" cy="15.3" r="1.05"/>',
+    note: '<path d="M6.2 3.6h7.6l4 4v12.8H6.2z"/><path d="M13.8 3.6v4h4M9.2 11.6h5.6M9.2 15h5.6"/>',
+    check: '<rect x="3.8" y="3.8" width="16.4" height="16.4" rx="1.6"/><path d="M8 12.4l2.7 2.7 5.3-5.6"/>',
+    tick: '<path d="M5 12.9l4.5 4.5L19 6.9"/>',
+    search: '<circle cx="10.6" cy="10.6" r="6.4"/><path d="M15.4 15.4L21 21"/>'
   };
   const ic = (n, cls) => `<svg viewBox="0 0 24 24" class="ico${cls ? ' ' + cls : ''}">${IC[n] || ''}</svg>`;
 
@@ -40,6 +44,8 @@
     { id: 'cities', label: '城市与背景', icon: 'city', key: 'cities' },
     { id: 'stories', label: '故事', icon: 'book', key: 'stories' },
     { id: 'timeline', label: '时间线', icon: 'time', key: 'timeline' },
+    { id: 'memos', label: '备忘录', icon: 'note', key: 'memos' },
+    { id: 'todos', label: '待办', icon: 'check', key: 'todos' },
     { id: 'privacy', label: '本地模式', icon: 'lock' }
   ];
 
@@ -125,6 +131,21 @@
         { k: 'kind', label: '关系类型', type: 'select', options: REL_KINDS.map(k => ({ v: k, t: k })) }
       ],
       auto: () => ({ a: '', b: '', label: '', kind: '其他' })
+    },
+    memos: {
+      kicker: 'Memo', title: '备忘录',
+      fields: [
+        { k: 'title', label: '标题', type: 'text', ph: '留空就只显示正文' },
+        { k: 'body', label: '内容', type: 'textarea', rows: 15, ph: '随手记点什么。想到一半也行，反正只有你看得到。' }
+      ],
+      auto: () => ({ title: '', body: '', createdAt: Date.now(), updatedAt: Date.now() })
+    },
+    todos: {
+      kicker: 'Todo', title: '待办',
+      fields: [
+        { k: 'text', label: '内容', type: 'textarea', rows: 3, req: true, ph: '要做什么' }
+      ],
+      auto: () => ({ text: '', done: false, createdAt: Date.now() })
     }
   };
 
@@ -133,6 +154,7 @@
     world: null,
     route: 'overview',
     storyFilter: 'all',
+    memoQuery: '',
     draft: null,
     draftKey: null,
     relGraph: null,
@@ -195,7 +217,10 @@
   function renderNav() {
     const w = App.world;
     $('#nav').innerHTML = NAV.map(n => {
-      const cnt = n.key ? (w[n.key] || []).length : '';
+      // 待办只数没做完的，做完的不占数字
+      const cnt = n.key
+        ? (n.key === 'todos' ? (w.todos || []).filter(t => !t.done).length : (w[n.key] || []).length)
+        : '';
       return `<button class="nav-item${App.route === n.id ? ' active' : ''}" data-act="nav" data-route="${n.id}">
         ${ic(n.icon)}<span>${n.label}</span>${cnt !== '' ? `<em class="count">${cnt}</em>` : ''}
       </button>`;
@@ -228,6 +253,8 @@
       cities: renderCities,
       stories: renderStories,
       timeline: renderTimeline,
+      memos: renderMemos,
+      todos: renderTodos,
       privacy: renderPrivacy
     };
     view.innerHTML = `<div class="view-inner">${(map[App.route] || renderOverview)()}</div>`;
@@ -235,6 +262,7 @@
 
     if (App.route === 'overview') paintPoster();
     if (App.route === 'relations') mountRelations();
+    if (App.route === 'memos') filterMemos(App.memoQuery);
   }
 
   function pageHead(title, desc, actions) {
@@ -720,6 +748,123 @@
       ${body}`;
   }
 
+  /* ---------------- 备忘录 ---------------- */
+  const pad2 = n => String(n).padStart(2, '0');
+  function fmtDay(ts) {
+    if (!ts) return '';
+    const d = new Date(ts);
+    return `${d.getFullYear()}.${pad2(d.getMonth() + 1)}.${pad2(d.getDate())}`;
+  }
+
+  function renderMemos() {
+    const list = (App.world.memos || []).slice()
+      .sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
+
+    const cards = list.map(m => {
+      const title = (m.title || '').trim();
+      const body = (m.body || '').trim();
+      const hay = (title + ' ' + body).toLowerCase();
+      return `<article class="memo" data-act="edit-item" data-key="memos" data-id="${m.id}" data-search="${esc(hay)}">
+        <div class="memo-head">
+          <h3${title ? '' : ' class="untitled"'}>${esc(title || '无标题便签')}</h3>
+          <div class="memo-acts">
+            <button class="card-act" data-act="del-item" data-key="memos" data-id="${m.id}" title="删除">${ic('trash')}</button>
+          </div>
+        </div>
+        <p class="memo-body">${esc(body || '（还没有写内容）')}</p>
+        <time>${fmtDay(m.updatedAt || m.createdAt)}</time>
+      </article>`;
+    }).join('');
+
+    const body = list.length ? `
+      <div class="memo-bar">
+        <div class="memo-search">
+          ${ic('search')}
+          <input type="text" id="memoSearch" placeholder="搜标题或正文" value="${esc(App.memoQuery)}" spellcheck="false">
+        </div>
+        <span class="memo-count">共 ${list.length} 张</span>
+      </div><div class="memo-grid">${cards}
+        <button class="memo memo-new" data-act="new-item" data-key="memos">
+          <span class="plus">+</span><span>写一张新便签</span>
+        </button>
+      </div>
+      <div class="memo-nohit" id="memoNoHit">没有找到包含这段字的便签。</div>` : `
+      <div class="empty">
+        <h3>还没有便签</h3>
+        <p>想到什么就先记下来——一句设定、一个名字、一段没头没尾的对话。<br>便签只存在这台设备上，不会出现在导出的长图里。</p>
+        <button class="btn primary" data-act="new-item" data-key="memos">${ic('plus')} 写第一张便签</button>
+      </div>`;
+
+    return `
+      ${pageHead('备忘录', '一个只给你自己看的便签本，不计入长图。最近改过的排在最前面。',
+        `<button class="btn primary" data-act="new-item" data-key="memos">${ic('plus')} 新建便签</button>`)}
+      ${body}`;
+  }
+
+  function filterMemos(q) {
+    q = String(q || '').trim().toLowerCase();
+    let hit = 0;
+    $$('.memo[data-id]').forEach(c => {
+      const ok = !q || (c.dataset.search || '').indexOf(q) >= 0;
+      c.classList.toggle('hide', !ok);
+      if (ok) hit += 1;
+    });
+    const hint = $('#memoNoHit');
+    if (hint) hint.classList.toggle('on', !!q && hit === 0);
+  }
+
+  /* ---------------- 待办 ---------------- */
+  function renderTodos() {
+    const all = App.world.todos || [];
+    const open = all.filter(t => !t.done);
+    const done = all.filter(t => t.done);
+    const pct = all.length ? Math.round(done.length / all.length * 100) : 0;
+
+    const row = t => `<div class="todo${t.done ? ' done' : ''}" data-id="${t.id}">
+      <button class="todo-box" data-act="todo-toggle" data-id="${t.id}" title="${t.done ? '标记为未完成' : '标记为已完成'}" aria-checked="${t.done ? 'true' : 'false'}">${t.done ? ic('tick') : ''}</button>
+      <div class="todo-text" data-act="edit-item" data-key="todos" data-id="${t.id}">${esc(t.text || '')}</div>
+      <div class="todo-acts">
+        <button class="card-act" data-act="edit-item" data-key="todos" data-id="${t.id}" title="编辑">${ic('edit')}</button>
+        <button class="card-act" data-act="todo-del" data-id="${t.id}" title="删除">${ic('trash')}</button>
+      </div>
+    </div>`;
+
+    return `
+      ${pageHead('待办事项', `共 ${all.length} 条，${open.length} 条还没做完。勾掉一条算一条，勾完会沉到下面。`,
+        done.length ? `<button class="btn ghost" data-act="todo-clear-done">清除已完成</button>` : '')}
+
+      <div class="todo-panel">
+        <div class="todo-add">
+          <input type="text" id="todoAdd" placeholder="写一件要做的事，回车添加" spellcheck="false" autocomplete="off">
+          <button class="btn primary" data-act="todo-add">${ic('plus')} 添加</button>
+        </div>
+
+        ${all.length ? `<div class="todo-prog-row"><span class="todo-stat">已完成 ${done.length} / ${all.length}</span><div class="todo-prog"><i style="width:${pct}%"></i></div></div>` : ''}
+
+        <div class="todo-list">
+          ${open.map(row).join('')}
+          ${!all.length ? `<div class="empty">
+            <h3>还没有待办</h3>
+            <p>要写的情节、要查的资料、要给人物补的设定——丢进来一件件划掉。<br>待办和便签一样，只存在本地，不进长图。</p>
+          </div>` : ''}
+        </div>
+
+        ${done.length ? `<div class="todo-sec"><h2>已完成</h2><span>${done.length} 条</span><i></i></div>
+        <div class="todo-list done-list">${done.map(row).join('')}</div>` : ''}
+      </div>`;
+  }
+
+  function addTodo(text) {
+    text = String(text || '').trim();
+    if (!text) { toast('先写点什么', true); return; }
+    Store.add('todos', { text, done: false, createdAt: Date.now() });
+    persist();
+    render();
+    const inp = $('#todoAdd');
+    if (inp) inp.focus();
+    toast('已添加');
+  }
+
   /* ---------------- 关系网 ---------------- */
   function renderRelations() {
     const chars = App.world.characters || [];
@@ -942,6 +1087,16 @@
         r.id !== App.draftId &&
         ((r.a === App.draft.a && r.b === App.draft.b) || (r.a === App.draft.b && r.b === App.draft.a)));
       if (dup) { toast('这条关系已经存在了', true); return; }
+    }
+
+    if (key === 'memos') {
+      if (!String(App.draft.title || '').trim() && !String(App.draft.body || '').trim()) {
+        toast('便签是空的，写点什么再保存', true);
+        const el = document.querySelector('[data-f="body"]');
+        if (el) el.focus();
+        return;
+      }
+      App.draft.updatedAt = Date.now();
     }
 
     if (App.draftId) {
@@ -1186,6 +1341,43 @@
           openDrawer('stories', null, { type: t.dataset.type || 'short' });
           break;
 
+        case 'todo-add': {
+          const inp = $('#todoAdd');
+          addTodo(inp ? inp.value : '');
+          break;
+        }
+
+        case 'todo-toggle': {
+          e.stopPropagation();
+          const item = findItem('todos', t.dataset.id);
+          if (!item) break;
+          item.done = !item.done;
+          item.doneAt = item.done ? Date.now() : 0;
+          persist();
+          render();
+          break;
+        }
+
+        case 'todo-del': {
+          e.stopPropagation();
+          Store.remove('todos', t.dataset.id);
+          persist();
+          render();
+          toast('已删除');
+          break;
+        }
+
+        case 'todo-clear-done': {
+          const n = (App.world.todos || []).filter(x => x.done).length;
+          if (!n) break;
+          if (!confirm(`确定清掉这 ${n} 条已完成的待办？此操作不可撤销。`)) break;
+          App.world.todos = (App.world.todos || []).filter(x => !x.done);
+          persist();
+          render();
+          toast(`已清除 ${n} 条`);
+          break;
+        }
+
         case 'edit-item': {
           e.stopPropagation();
           openDrawer(t.dataset.key, t.dataset.id);
@@ -1403,6 +1595,12 @@
 
     // 标签输入
     document.addEventListener('keydown', e => {
+      // 待办：回车即添加
+      if (e.target.id === 'todoAdd' && e.key === 'Enter') {
+        e.preventDefault();
+        addTodo(e.target.value);
+        return;
+      }
       const inp = e.target.closest('[data-taginput]');
       if (inp && (e.key === 'Enter' || e.key === ',' || e.key === '，')) {
         e.preventDefault();
@@ -1469,9 +1667,16 @@
       if (field && file) applyImageFile(field, file);
     });
 
+    // 备忘录搜索（原地过滤，不重绘，输入框不会掉焦点）
+    document.addEventListener('input', e => {
+      if (e.target.id === 'memoSearch') {
+        App.memoQuery = e.target.value;
+        filterMemos(App.memoQuery);
+      }
+    });
+
     // 场景选择
-    document.addEventListener('change', e => {
-      if (e.target.id === 'sceneSelect') {
+    document.addEventListener('change', e => {      if (e.target.id === 'sceneSelect') {
         const v = e.target.value;
         if (v === 'auto') App.world.poster.sceneRef = { type: 'auto' };
         else if (v.startsWith('city:')) App.world.poster.sceneRef = { type: 'city', id: v.slice(5) };
