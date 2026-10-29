@@ -1,5 +1,6 @@
 /* ============================================================
-   store.js — 数据层：IndexedDB 持久化 + 默认示例世界
+   store.js — 数据层：IndexedDB 持久化 + 首次打开为空白世界
+   （示例世界仅在你主动点「示例」时载入，不再预填）
    ============================================================ */
 (function () {
   'use strict';
@@ -221,7 +222,7 @@
 
   /* ---------------- 迁移 / 补全 ---------------- */
   function normalize(s) {
-    if (!s || typeof s !== 'object') return sampleWorld();
+    if (!s || typeof s !== 'object') return blankWorld('');
     s.version = s.version || 1;
     s.meta = s.meta || { name: '未命名世界' };
     ['characters', 'relations', 'factions', 'cities', 'stories', 'timeline'].forEach(k => {
@@ -250,6 +251,30 @@
     return s;
   }
 
+  /* ---------------- 指纹：判断「示例世界是否原封未动」 ---------------- */
+  /* 只比内容：id、时间戳、以及所有指向 id 的引用都抹成占位符，
+     这样即便每次生成的 id 不同也能正确比对 */
+  const ID_RE = /^[a-z]_[0-9a-z]+$/i;
+  function fingerprint(s) {
+    const strip = (o) => {
+      if (Array.isArray(o)) return o.map(strip);
+      if (o && typeof o === 'object') {
+        const r = {};
+        Object.keys(o).sort().forEach(k => {
+          if (k === 'id' || k === 'createdAt' || k === 'updatedAt') return;
+          r[k] = strip(o[k]);
+        });
+        return r;
+      }
+      if (typeof o === 'string') return ID_RE.test(o) ? '#' : o;
+      return o;
+    };
+    try { return JSON.stringify(strip(s)); } catch (e) { return ''; }
+  }
+  function isPristineSample(s) {
+    return fingerprint(s) === fingerprint(sampleWorld());
+  }
+
   /* ---------------- 对外接口 ---------------- */
   const Store = {
     state: null,
@@ -265,19 +290,16 @@
           if (ls) raw = JSON.parse(ls);
         } catch (e) { /* ignore */ }
       }
-      if (!raw) raw = sampleWorld();  // 默认带示例，所有文字均可在表单里自由改
 
-      // 之前一版默认是空白，老用户浏览器里可能存着一张彻底空白的画布。
-      // 只在「一个字都没填」且用户没有主动点过「新建」时，替他补回示例。
-      if (raw && !window.localStorage.getItem('worldcraft.reset')) {
-        const empty = !String((raw.meta || {}).name || '').trim()
-          && !(raw.characters || []).length
-          && !(raw.factions || []).length
-          && !(raw.cities || []).length
-          && !(raw.stories || []).length
-          && !(raw.timeline || []).length;
-        if (empty) raw = sampleWorld();
-      }
+      // 首次打开就是一张白纸：不预填任何人物、故事或示例内容
+      if (!raw) raw = blankWorld('');
+
+      // 老版本会在第一次打开时自动灌入示例世界。已经升级过的浏览器里
+      // 还留着那份数据，这里只清「一字未改过的示例」，动过一个字就原样保留。
+      let flagged = true;
+      try { flagged = !!localStorage.getItem('worldcraft.blankv2'); } catch (e) { /* ignore */ }
+      if (!flagged && raw && isPristineSample(raw)) raw = blankWorld('');
+      try { localStorage.setItem('worldcraft.blankv2', '1'); } catch (e) { /* ignore */ }
 
       this.state = normalize(raw);
       return this.state;

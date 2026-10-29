@@ -1289,7 +1289,6 @@
 
         case 'reset-world': {
           if (!confirm('新建会清空当前世界的所有内容，确定继续？建议先「备份数据」。')) break;
-          try { localStorage.setItem('worldcraft.reset', '1'); } catch (e) {}
           Store.replace(Store.blankWorld(''));
           App.world = Store.state;
           Store.save().then(() => {
