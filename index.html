@@ -39,9 +39,15 @@
     </div>
   </aside>
 
+  <div class="nav-mask" id="navMask"></div>
+
   <!-- ============ 主区 ============ -->
   <main class="main">
     <header class="topbar">
+      <button class="btn icon menu-btn" id="menuBtn" data-act="toggle-menu"
+              aria-label="打开目录" aria-controls="nav" aria-expanded="false">
+        <svg viewBox="0 0 24 24" class="ico"><path d="M3.6 7.2h16.8M3.6 12h16.8M3.6 16.8h11.2"/></svg>
+      </button>
       <div class="topbar-title">
         <input class="world-title" id="worldTitle" placeholder="为你的世界命名…" spellcheck="false" />
         <span class="crumb" id="crumb">总览</span>

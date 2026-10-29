@@ -227,7 +227,24 @@
     }).join('');
   }
 
+  /* 窄屏目录抽屉：860px 以下侧栏改为从左侧滑出，这里只管开合 */
+  function setMenu(open) {
+    const sb = $('.sidebar');
+    const mask = $('#navMask');
+    const btn = $('#menuBtn');
+    if (!sb || !mask) return;
+    sb.classList.toggle('open', !!open);
+    mask.classList.toggle('on', !!open);
+    if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+
+  function menuOpen() {
+    const sb = $('.sidebar');
+    return !!(sb && sb.classList.contains('open'));
+  }
+
   function go(route) {
+    setMenu(false);
     if (App.route === route) return;
     App.route = route;
     location.hash = route;
@@ -1322,6 +1339,7 @@
       if (!t) {
         // 点遮罩关抽屉
         if (e.target.id === 'drawerMask') closeDrawer();
+        if (e.target.id === 'navMask') setMenu(false);
         if (e.target.id === 'lightbox') $('#lightbox').classList.remove('on');
         return;
       }
@@ -1329,6 +1347,7 @@
 
       switch (act) {
         case 'nav': go(t.dataset.route); break;
+        case 'toggle-menu': setMenu(!menuOpen()); break;
         case 'goto-poster': go('overview'); break;
         case 'close-drawer': closeDrawer(); break;
         case 'save-drawer': saveDraft(); break;
@@ -1591,6 +1610,9 @@
 
         default: break;
       }
+
+      // 从目录里点了什么，顺手把目录收起来（导出/备份/导入/新建这些都算）
+      if (act !== 'toggle-menu' && t.closest('.sidebar')) setMenu(false);
     });
 
     // 标签输入
@@ -1614,7 +1636,8 @@
         inp.focus();
       }
       if (e.key === 'Escape') {
-        if ($('#drawer').classList.contains('on')) closeDrawer();
+        if (menuOpen()) setMenu(false);
+        else if ($('#drawer').classList.contains('on')) closeDrawer();
         else if ($('#lightbox').classList.contains('on')) $('#lightbox').classList.remove('on');
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
@@ -1696,7 +1719,15 @@
 
     window.addEventListener('hashchange', () => {
       const r = location.hash.slice(1) || 'overview';
+      setMenu(false);
       if (r !== App.route) { App.route = r; render(); }
+    });
+
+    // 转回桌面宽度时收起目录，免得下次回到窄屏还开着
+    let lastNarrow = window.innerWidth <= 860;
+    window.addEventListener('resize', () => {
+      const narrow = window.innerWidth <= 860;
+      if (narrow !== lastNarrow) { lastNarrow = narrow; if (!narrow) setMenu(false); }
     });
   }
 
