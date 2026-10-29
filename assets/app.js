@@ -31,6 +31,8 @@
     note: '<path d="M6.2 3.6h7.6l4 4v12.8H6.2z"/><path d="M13.8 3.6v4h4M9.2 11.6h5.6M9.2 15h5.6"/>',
     check: '<rect x="3.8" y="3.8" width="16.4" height="16.4" rx="1.6"/><path d="M8 12.4l2.7 2.7 5.3-5.6"/>',
     tick: '<path d="M5 12.9l4.5 4.5L19 6.9"/>',
+    up: '<path d="M12 19.2V5.4M6.6 10.8L12 5.4l5.4 5.4"/>',
+    down: '<path d="M12 4.8v13.8M6.6 13.2L12 18.6l5.4-5.4"/>',
     search: '<circle cx="10.6" cy="10.6" r="6.4"/><path d="M15.4 15.4L21 21"/>'
   };
   const ic = (n, cls) => `<svg viewBox="0 0 24 24" class="ico${cls ? ' ' + cls : ''}">${IC[n] || ''}</svg>`;
@@ -719,17 +721,42 @@
 
   /* ---------------- 时间线 ---------------- */
   /* 时间线：按画面上的分组顺序摊平，保证 ↑↓ 移动的就是「看到的上/下一条」 */
-  function visualTimeline(list) {
-    const names = [];
-    list.forEach(it => {
-      const n = it.era || '未归类';
-      if (!names.includes(n)) names.push(n);
+  const eraKey = it => it.era || '未归类';
+  function eraNames(list) {
+    const out = [];
+    (list || []).forEach(it => {
+      const n = eraKey(it);
+      if (!out.includes(n)) out.push(n);
     });
+    return out;
+  }
+
+  function visualTimeline(list) {
+    const names = eraNames(list);
     const out = [];
     names.forEach(n => list.forEach(it => {
-      if ((it.era || '未归类') === n) out.push(it);
+      if (eraKey(it) === n) out.push(it);
     }));
     return out;
+  }
+
+  /* 整组挪动：把该纪元的节点整体搬到相邻纪元的上面或下面 */
+  function moveEra(name, dir) {
+    const list = (App.world.timeline || []).slice();
+    const names = eraNames(list);
+    const i = names.indexOf(name);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= names.length) return false;
+    const mine = list.filter(it => eraKey(it) === name);
+    const rest = list.filter(it => eraKey(it) !== name);
+    const target = names[j];
+    const pos = [];
+    rest.forEach((it, k) => { if (eraKey(it) === target) pos.push(k); });
+    if (!pos.length) return false;
+    const at = dir < 0 ? pos[0] : pos[pos.length - 1] + 1;
+    rest.splice(at, 0, ...mine);
+    App.world.timeline = rest;
+    return true;
   }
 
   function renderTimeline() {
@@ -748,13 +775,17 @@
           <h2>${esc(e.name)}</h2>
           <span class="num">${e.items.length} 个节点</span>
           <span class="rule"></span>
+          <div class="era-acts">
+            <button class="tl-act" data-act="move-era" data-era="${esc(e.name)}" data-dir="-1" title="整个纪世上移"${ei === 0 ? ' disabled' : ''}>${ic('up')}</button>
+            <button class="tl-act" data-act="move-era" data-era="${esc(e.name)}" data-dir="1" title="整个纪元下移"${ei === eras.length - 1 ? ' disabled' : ''}>${ic('down')}</button>
+          </div>
         </div>
         <div class="tl">
           ${e.items.map((t, i) => `
             <div class="tl-item" data-act="edit-item" data-key="timeline" data-id="${t.id}">
               <div class="tl-acts">
-                <button class="tl-act" data-act="move-tl" data-dir="-1" data-id="${t.id}" title="上移一位"${ei === 0 && i === 0 ? ' disabled' : ''}>↑</button>
-                <button class="tl-act" data-act="move-tl" data-dir="1" data-id="${t.id}" title="下移一位"${ei === eras.length - 1 && i === e.items.length - 1 ? ' disabled' : ''}>↓</button>
+                <button class="tl-act" data-act="move-tl" data-dir="-1" data-id="${t.id}" title="上移一位"${ei === 0 && i === 0 ? ' disabled' : ''}>${ic('up')}</button>
+                <button class="tl-act" data-act="move-tl" data-dir="1" data-id="${t.id}" title="下移一位"${ei === eras.length - 1 && i === e.items.length - 1 ? ' disabled' : ''}>${ic('down')}</button>
               </div>
               <div class="tl-date">${esc(t.date || '时间待定')}</div>
               <h3>${esc(t.title || '未命名事件')} ${t.type ? `<span class="chip">${esc(t.type)}</span>` : ''}</h3>
@@ -768,7 +799,7 @@
       </div>`;
 
     return `
-      ${pageHead('总时间线', `共 ${list.length} 个节点，按纪元分组。新事件加在末尾；悬停节点，右上角 ↑ ↓ 可手动调整顺序。`,
+      ${pageHead('总时间线', `共 ${list.length} 个节点，按纪元分组。新事件加在末尾；悬停节点，右上角 ↑ ↓ 调单个事件，纪元标题右侧 ↑ ↓ 整组挪动。`,
         `<button class="btn primary" data-act="new-item" data-key="timeline">${ic('plus')} 新增事件</button>`)}
       ${body}`;
   }
@@ -1411,6 +1442,16 @@
           break;
         }
 
+        case 'move-era': {
+          e.stopPropagation();
+          const name = t.dataset.era, dir = +t.dataset.dir;
+          if (!moveEra(name, dir)) break;
+          persist();
+          render();
+          toast(`「${name}」已${dir < 0 ? '上移' : '下移'}`);
+          break;
+        }
+
         case 'move-tl': {
           e.stopPropagation();
           const id = t.dataset.id, dir = +t.dataset.dir;
@@ -1422,8 +1463,7 @@
           if (i < 0 || j < 0 || j >= order.length) break;
           const a = order[i], b = order[j];
           const ia = list.indexOf(a), ib = list.indexOf(b);
-          const eraName = it => it.era || '未归类';
-          if (eraName(a) === eraName(b)) {
+          if (eraKey(a) === eraKey(b)) {
             // 同一纪元内：交换数组位置即可
             list[ia] = b; list[ib] = a;
           } else {
